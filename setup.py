@@ -5,7 +5,7 @@ with open("README.md", 'r') as file_handle:
 
 setup(
     name = "MBAR_PyTorch",
-    version = "0.0.0a1",
+    version = "0.0.0a4",
     author = "Xinqiang (Shawn) Ding",
     author_email = "xqding@umich.edu",
     description = "A fast implementation of MBAR method using PyTorch",
