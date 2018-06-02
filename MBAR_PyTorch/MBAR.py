@@ -7,7 +7,31 @@ import torch.nn as nn
 import scipy.optimize as optimize
 
 class MBAR():
+    
+    """
+    The MBAR class is initialized with an energy matrix and an array
+    of num of conformations. After initizlization, the MBAR class method
+    solve is used to calculate the relative free energyies for all states.
+
+    """
+    
     def __init__(self, energy, num_conf, cuda = False):
+        """Initizlizer for class MBAR
+
+        Parameters
+        ----------
+        energy : 2-D float ndarray with size of (M x N)
+            A 2-D ndarray with size of M x N, where M is the number of stats
+            and N is the total number of conformations. The entry energy[i,j]
+            is the reduced (unitless) energy of conformation j in state i.
+        num_conf: 1-D int ndarray with size (M)
+            A 1-D ndarray with size of M, where num_conf[i] is the num of 
+            conformations sampled from state i. Therefore, np.sum(num_conf)
+            has to be equal to N.
+        cuda: bool, optional
+            If it is set to be True, then the calculation in MBAR.solve will be
+            run on graphical processing units (GPUs).        
+        """
         self.cuda = cuda
         
         self.energy = energy
@@ -35,7 +59,7 @@ class MBAR():
         self.bias_energy_nz = None
 
         
-    def loss_nz(self, bias_energy_nz):
+    def _loss_nz(self, bias_energy_nz):
         assert(self.num_states_nz == len(bias_energy_nz))
         bias_energy_nz = torch.tensor(bias_energy_nz,
                                       requires_grad = True,
@@ -52,13 +76,23 @@ class MBAR():
         loss = torch.sum(torch.log(tmp)) + torch.sum(self.num_conf_nz*self.bias_energy_nz)
 
         loss.backward()
-        return loss.cpu().detach().numpy().astype(np.float64), bias_energy_nz.cpu().grad.numpy().astype(np.float64)
+        return (loss.cpu().detach().numpy().astype(np.float64),
+                bias_energy_nz.cpu().grad.numpy().astype(np.float64))
 
-    def solve(self):
+    def calculate_free_energies(self):
+        """ calculate the relative free energies for all states
+        
+        Returns
+        -------
+        F: 1-D float array with size of (M)
+         the relative unitless free energies for all states
+
+        """
+        
         x0 = self.energy_nz.new(self.num_states_nz).zero_()
         x0 = x0.cpu().numpy()
         
-        x, f, d = optimize.fmin_l_bfgs_b(self.loss_nz, x0, iprint = 1)        
+        x, f, d = optimize.fmin_l_bfgs_b(self._loss_nz, x0, iprint = 1)        
         self.bias_energy_nz = self.energy_nz.new(x)
         if self.cuda:
             self.bias_energy_nz = self.bias_energy_nz.cuda()
